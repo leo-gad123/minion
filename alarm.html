@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Firebase Multi-Alarm Clock</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #2c3e50, #3498db);
+      color: white;
+      text-align: center;
+      padding: 40px;
+    }
+    .clock {
+      font-size: 48px;
+      margin: 20px 0;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 18px;
+      border-radius: 8px;
+      border: none;
+      margin: 5px;
+    }
+    button {
+      background: #27ae60;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #2ecc71;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      background: rgba(255, 255, 255, 0.1);
+      margin: 5px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .remove-btn {
+      background: #e74c3c;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .remove-btn:hover {
+      background: #c0392b;
+    }
+  </style>
+</head>
+<body>
+  <h1>⏰ Firebase Multi-Alarm Clock</h1>
+  <div class="clock" id="currentTime">00:00:00</div>
+
+  <label>Set Hour: </label>
+  <input type="number" id="alarmHour" min="0" max="23" placeholder="HH">
+  <label>Set Minute: </label>
+  <input type="number" id="alarmMinute" min="0" max="59" placeholder="MM">
+  <br>
+  <button onclick="addAlarm()">Add Alarm</button>
+
+  <h2>My Alarms (Firebase)</h2>
+  <ul id="alarmList"></ul>
+
+  <audio id="alarmSound" src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" preload="auto"></audio>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <script>
+    // ✅ Configure Firebase
+    const firebaseConfig = {
+      databaseURL: "https://test-3e174-default-rtdb.firebaseio.com/"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const alarmsRef = db.ref("alarms");
+
+    // Update clock
+    function updateClock() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString();
+      document.getElementById("currentTime").textContent = timeString;
+
+      alarmsRef.once("value", (snapshot) => {
+        snapshot.forEach((child) => {
+          const alarm = child.val();
+
+          if (
+            now.getHours() === alarm.hours &&
+            now.getMinutes() === alarm.minutes &&
+            now.getSeconds() === 0 &&
+            !alarm.triggered
+          ) {
+            // Delay alarm by 10s
+            setTimeout(() => {
+              document.getElementById("alarmSound").play();
+              alert(`⏰ Alarm for ${alarm.display} is ringing after 10s delay!`);
+              alarmsRef.child(child.key).update({ triggered: true });
+              return false; // stop repeated execution
+            }, 10000);
+          }
+        });
+      });
+    }
+    setInterval(updateClock, 1000);
+
+    // Add alarm
+    function addAlarm() {
+      const hours = parseInt(document.getElementById("alarmHour").value);
+      const minutes = parseInt(document.getElementById("alarmMinute").value);
+
+      if (isNaN(hours) || isNaN(minutes)) {
+        alert("Please enter a valid hour and minute.");
+        return;
+      }
+
+      const alarmTime = {
+        hours,
+        minutes,
+        display: `${hours.toString().padStart(2, "0")}:${minutes
+          .toString()
+          .padStart(2, "0")}`,
+        triggered: false
+      };
+
+      alarmsRef.push(alarmTime);
+    }
+
+    // Remove alarm
+    function removeAlarm(key) {
+      alarmsRef.child(key).remove();
+    }
+
+    // Render alarms in real-time
+    alarmsRef.on("value", (snapshot) => {
+      const alarmList = document.getElementById("alarmList");
+      alarmList.innerHTML = "";
+      snapshot.forEach((child) => {
+        const alarm = child.val();
+        const li = document.createElement("li");
+        li.innerHTML = `
+          ${alarm.display}
+          <button class="remove-btn" onclick="removeAlarm('${child.key}')">Remove</button>
+        `;
+        alarmList.appendChild(li);
+      });
+    });
+  </script>
+</body>
+</html>
