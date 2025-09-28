@@ -2,158 +2,170 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Firebase Multi-Alarm Clock</title>
+  <title>⚡ Ion Alarm Scheduler (HH:MM:SS + State)</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: linear-gradient(to right, #2c3e50, #3498db);
+      background: linear-gradient(135deg, #ff7eb3, #65d6ce, #ffdd94);
       color: white;
       text-align: center;
-      padding: 40px;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
     }
-    .clock {
-      font-size: 48px;
-      margin: 20px 0;
+    h1 {
+      font-size: 2.5rem;
+      margin-top: 20px;
+      text-shadow: 0px 0px 10px black;
+      animation: glow 2s infinite alternate;
+    }
+    @keyframes glow {
+      from { text-shadow: 0 0 5px #fff, 0 0 10px #ff0080, 0 0 20px #ff0080; }
+      to { text-shadow: 0 0 10px #00ffe1, 0 0 20px #00ffe1, 0 0 30px #00ffe1; }
+    }
+    #controls {
+      margin-top: 40px;
     }
     input, button {
-      padding: 10px;
-      font-size: 18px;
-      border-radius: 8px;
+      font-size: 1.2rem;
+      padding: 10px 15px;
+      border-radius: 12px;
       border: none;
+      outline: none;
       margin: 5px;
     }
     button {
-      background: #27ae60;
+      background: linear-gradient(45deg, #00c6ff, #0072ff);
       color: white;
       cursor: pointer;
+      transition: transform 0.2s;
     }
     button:hover {
-      background: #2ecc71;
+      transform: scale(1.1);
     }
     ul {
+      margin-top: 30px;
       list-style: none;
       padding: 0;
     }
     li {
-      background: rgba(255, 255, 255, 0.1);
-      margin: 5px;
+      margin: 10px 0;
       padding: 10px;
-      border-radius: 6px;
-      font-size: 20px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.3);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      animation: pulse 3s infinite;
     }
-    .remove-btn {
-      background: #e74c3c;
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); background: rgba(255,255,255,0.2); }
+      100% { transform: scale(1); }
+    }
+    .deleteBtn {
+      background: linear-gradient(45deg, #ff416c, #ff4b2b);
+      border: none;
       padding: 5px 10px;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
+      color: white;
+      font-size: 1rem;
+      margin-left: 5px;
     }
-    .remove-btn:hover {
-      background: #c0392b;
+    .deleteBtn:hover { transform: scale(1.2); }
+
+    .stateBtn {
+      background: linear-gradient(45deg, #ffdd00, #ff9900);
+      border: none;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: black;
+      font-size: 1rem;
+      margin-left: 5px;
     }
+    .stateBtn:hover { transform: scale(1.2); }
   </style>
 </head>
 <body>
-  <h1>⏰ Firebase Multi-Alarm Clock</h1>
-  <div class="clock" id="currentTime">00:00:00</div>
-
-  <label>Set Hour: </label>
-  <input type="number" id="alarmHour" min="0" max="23" placeholder="HH">
-  <label>Set Minute: </label>
-  <input type="number" id="alarmMinute" min="0" max="59" placeholder="MM">
-  <br>
-  <button onclick="addAlarm()">Add Alarm</button>
-
-  <h2>My Alarms (Firebase)</h2>
+  <h1>⚡ Ion Mode Alarm Scheduler ⏰ (HH:MM:SS + State)</h1>
+  <div id="controls">
+    <input type="number" id="hours" min="0" max="23" placeholder="HH">
+    <input type="number" id="minutes" min="0" max="59" placeholder="MM">
+    <input type="number" id="seconds" min="0" max="59" placeholder="SS">
+    <button onclick="addAlarm()">➕ Add Alarm</button>
+  </div>
+  
+  <h2>🕒 Scheduled Alarms</h2>
   <ul id="alarmList"></ul>
 
-  <audio id="alarmSound" src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" preload="auto"></audio>
-
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
   <script>
-    // ✅ Configure Firebase
-    const firebaseConfig = {
-      databaseURL: "https://test-3e174-default-rtdb.firebaseio.com/"
+    // 🔹 Firebase Config
+    var firebaseConfig = {
+      apiKey: "wyXceByxjUTKEWKlLXrOm64YT2SpmG5OZujyTf8l",
+      authDomain: "test-3e174.firebaseapp.com",
+      databaseURL: "https://test-3e174-default-rtdb.firebaseio.com/",
+      projectId: "test-3e174",
+      storageBucket: "test-3e174.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef123456"
     };
-
     firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    var db = firebase.database();
 
-    const alarmsRef = db.ref("alarms");
-
-    // Update clock
-    function updateClock() {
-      const now = new Date();
-      const timeString = now.toLocaleTimeString();
-      document.getElementById("currentTime").textContent = timeString;
-
-      alarmsRef.once("value", (snapshot) => {
-        snapshot.forEach((child) => {
-          const alarm = child.val();
-
-          if (
-            now.getHours() === alarm.hours &&
-            now.getMinutes() === alarm.minutes &&
-            now.getSeconds() === 0 &&
-            !alarm.triggered
-          ) {
-            // Delay alarm by 10s
-            setTimeout(() => {
-              document.getElementById("alarmSound").play();
-              alert(`⏰ Alarm for ${alarm.display} is ringing after 10s delay!`);
-              alarmsRef.child(child.key).update({ triggered: true });
-              return false; // stop repeated execution
-            }, 10000);
-          }
-        });
-      });
-    }
-    setInterval(updateClock, 1000);
-
-    // Add alarm
+    // 🔹 Add alarm
     function addAlarm() {
-      const hours = parseInt(document.getElementById("alarmHour").value);
-      const minutes = parseInt(document.getElementById("alarmMinute").value);
-
-      if (isNaN(hours) || isNaN(minutes)) {
-        alert("Please enter a valid hour and minute.");
-        return;
+      let hh = document.getElementById("hours").value.padStart(2,'0');
+      let mm = document.getElementById("minutes").value.padStart(2,'0');
+      let ss = document.getElementById("seconds").value.padStart(2,'0');
+      if(hh && mm && ss){
+        let time = `${hh}:${mm}:${ss}`;
+        let newRef = db.ref("alarms").push();
+        newRef.set({ time: time });
+        // create initial state = 0
+        db.ref("state/" + newRef.key).set(0);
+      } else {
+        alert("Enter valid HH, MM, SS!");
       }
-
-      const alarmTime = {
-        hours,
-        minutes,
-        display: `${hours.toString().padStart(2, "0")}:${minutes
-          .toString()
-          .padStart(2, "0")}`,
-        triggered: false
-      };
-
-      alarmsRef.push(alarmTime);
     }
 
-    // Remove alarm
-    function removeAlarm(key) {
-      alarmsRef.child(key).remove();
+    // 🔹 Delete alarm
+    function deleteAlarm(id) {
+      db.ref("alarms/" + id).remove();
+      db.ref("state/" + id).remove();
     }
 
-    // Render alarms in real-time
-    alarmsRef.on("value", (snapshot) => {
-      const alarmList = document.getElementById("alarmList");
-      alarmList.innerHTML = "";
-      snapshot.forEach((child) => {
-        const alarm = child.val();
-        const li = document.createElement("li");
-        li.innerHTML = `
-          ${alarm.display}
-          <button class="remove-btn" onclick="removeAlarm('${child.key}')">Remove</button>
-        `;
-        alarmList.appendChild(li);
+    // 🔹 Reset state manually
+    function resetState(id) {
+      db.ref("state/" + id).set(0);
+    }
+
+    // 🔹 Display alarms with state
+    db.ref("alarms").on("value", function(snapshot) {
+      let alarms = [];
+      snapshot.forEach(function(child) {
+        alarms.push({ id: child.key, time: child.val().time });
+      });
+
+      // Sort alarms HH:MM:SS
+      alarms.sort((a,b)=> a.time.localeCompare(b.time));
+
+      let list = document.getElementById("alarmList");
+      list.innerHTML = "";
+
+      alarms.forEach(alarm => {
+        // Fetch state
+        db.ref("state/" + alarm.id).once("value").then(snap => {
+          let state = snap.val();
+          let li = document.createElement("li");
+          li.innerHTML = `⏰ ${alarm.time} | State: ${state == 0 ? "Active" : "Triggered"}
+            <button class="deleteBtn" onclick="deleteAlarm('${alarm.id}')">❌ Delete</button>
+            <button class="stateBtn" onclick="resetState('${alarm.id}')">🔄 Reset</button>`;
+          list.appendChild(li);
+        });
       });
     });
   </script>
